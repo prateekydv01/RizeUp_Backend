@@ -102,25 +102,23 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
 })
 
 export const logoutUser = asyncHandler(async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id)
-        user.refreshToken = undefined;
-        await user.save({ validateBeforeSave: false });
 
-        const options = {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: 'strict'
-        }
+    await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: { refreshToken: undefined } },
+        { new: true }
+    );
 
-        return res
-            .status(200)
-            .clearCookie("accessToken", options)
-            .clearCookie("refreshToken", options)
-            .json(new ApiResponse(200, {}, "User logged out successfully!"))
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict"
+    };
 
-    } catch (error) {
-        console.error("Logout error:", error)
-        throw new ApiError(500, "Something went wrong while logging out")
-    }
-})
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out successfully"));
+
+});
