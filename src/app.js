@@ -18,11 +18,13 @@ app.use(cookieParser());
 
 import userRouter from "./routes/user.routes.js";
 import todoRouter from "./routes/todo.routes.js"
+import sectionRouter from "./routes/section.routes.js"
 import circleRouter from "./routes/circle.routes.js"
 import goalRouter from "./routes/goal.routes.js"
 
 app.use("/api/v1/user", userRouter);
-app.use("/api/v1/todo", todoRouter);
+app.use("/api/v1/todos", todoRouter);
+app.use("/api/v1/todo-sections",sectionRouter );
 app.use("/api/v1/circle",circleRouter);
 app.use("/api/v1/goal",goalRouter);
 

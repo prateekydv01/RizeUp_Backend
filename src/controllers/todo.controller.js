@@ -3,20 +3,22 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+
 /**
  * CREATE TODO
  */
 export const createTodo = asyncHandler(async (req, res) => {
-  const { title, type } = req.body;
 
-  if (!title) {
-    throw new ApiError(400, "Todo title is required");
+  const { title, section } = req.body;
+
+  if (!title || !section) {
+    throw new ApiError(400, "Title and section are required");
   }
 
   const todo = await Todo.create({
     title,
-    type,
-    user: req.user._id,
+    section,
+    user: req.user._id
   });
 
   return res.status(201).json(
@@ -24,27 +26,36 @@ export const createTodo = asyncHandler(async (req, res) => {
   );
 });
 
+
 /**
- * GET ALL TODOS OF USER
+ * GET TODOS OF A SECTION
  */
-export const getTodos = asyncHandler(async (req, res) => {
-  const todos = await Todo.find({ user: req.user._id });
+export const getSectionTodos = asyncHandler(async (req, res) => {
+
+  const { sectionId } = req.params;
+
+  const todos = await Todo.find({
+    user: req.user._id,
+    section: sectionId
+  });
 
   return res.status(200).json(
     new ApiResponse(200, todos, "Todos fetched successfully")
   );
 });
 
+
 /**
- * UPDATE TODO (title / type)
+ * UPDATE TODO
  */
 export const updateTodo = asyncHandler(async (req, res) => {
+
   const { todoId } = req.params;
-  const { title, type } = req.body;
+  const { title } = req.body;
 
   const todo = await Todo.findOneAndUpdate(
     { _id: todoId, user: req.user._id },
-    { title, type },
+    { title },
     { new: true }
   );
 
@@ -57,19 +68,25 @@ export const updateTodo = asyncHandler(async (req, res) => {
   );
 });
 
+
 /**
- * TOGGLE COMPLETE / INCOMPLETE
+ * TOGGLE COMPLETE
  */
 export const toggleTodo = asyncHandler(async (req, res) => {
+
   const { todoId } = req.params;
 
-  const todo = await Todo.findOne({ _id: todoId, user: req.user._id });
+  const todo = await Todo.findOne({
+    _id: todoId,
+    user: req.user._id
+  });
 
   if (!todo) {
     throw new ApiError(404, "Todo not found");
   }
 
   todo.completed = !todo.completed;
+
   await todo.save();
 
   return res.status(200).json(
@@ -77,15 +94,17 @@ export const toggleTodo = asyncHandler(async (req, res) => {
   );
 });
 
+
 /**
  * DELETE TODO
  */
 export const deleteTodo = asyncHandler(async (req, res) => {
+
   const { todoId } = req.params;
 
   const todo = await Todo.findOneAndDelete({
     _id: todoId,
-    user: req.user._id,
+    user: req.user._id
   });
 
   if (!todo) {
@@ -94,26 +113,5 @@ export const deleteTodo = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, null, "Todo deleted successfully")
-  );
-});
-
-
-/**
- * GET TODOS BY TYPE
- */
-export const getTodosByType = asyncHandler(async (req, res) => {
-  const { type } = req.params;
-
-  if (!type) {
-    throw new ApiError(400, "Todo type is required");
-  }
-
-  const todos = await Todo.find({
-    user: req.user._id,
-    type: type,
-  });
-
-  return res.status(200).json(
-    new ApiResponse(200, todos, "Todos fetched by type successfully")
   );
 });
