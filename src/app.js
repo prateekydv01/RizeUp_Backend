@@ -21,12 +21,16 @@ import todoRouter from "./routes/todo.routes.js"
 import sectionRouter from "./routes/section.routes.js"
 import circleRouter from "./routes/circle.routes.js"
 import goalRouter from "./routes/goal.routes.js"
+import checkInRouter from "./routes/checkIn.routes.js";
+import googleRouter from "./routes/google.routes.js"
 
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/todos", todoRouter);
 app.use("/api/v1/todo-sections",sectionRouter );
 app.use("/api/v1/circle",circleRouter);
 app.use("/api/v1/goal",goalRouter);
+app.use("/api/v1/checkin", checkInRouter);
+app.use("/api/v1/google", googleRouter)
 
 app.use((err, req, res, next) => {
   console.log("🔥 REAL ERROR OBJECT 🔥");

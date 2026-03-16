@@ -12,11 +12,10 @@ const UserSchema = new Schema(
       required: true,
       trim: true,
     },
-
-    username:{
-      type:String,
-      required:true,
-      unique:true
+    username: {
+      type: String,
+      required: true,
+      unique: true,
     },
     email: {
       type: String,
@@ -24,40 +23,36 @@ const UserSchema = new Schema(
       unique: true,
       lowercase: true,
     },
-
     password: {
       type: String,
       required: true,
     },
-
     streak: {
       type: Number,
       default: 0,
     },
-
     lastCheckInDate: {
-      type: String,
+      type: String, // "YYYY-MM-DD"
     },
-
-    joinedCircles: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Circle",
-      },
-    ],
-
     bookmarks: [
       {
         title: String,
         url: String,
       },
     ],
+
+    // ── Google Calendar ──────────────────────────────────────────────────────
+    googleAccessToken:  { type: String },
+    googleRefreshToken: { type: String },
+    googleTokenExpiry:  { type: Number },    // epoch ms
+    googleCalendarId:   { type: String, default: "primary" },
+    googleConnected:    { type: Boolean, default: false },
+    // ────────────────────────────────────────────────────────────────────────
+
     refreshToken: {
       type: String,
     },
   },
-  
-
   { timestamps: true }
 );
 
@@ -66,29 +61,28 @@ UserSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 10);
 });
 
+UserSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+};
 
-UserSchema.methods.isPasswordCorrect = async function (password){
-    return await bcrypt.compare(password,this.password) 
-}
-
-UserSchema.methods.generateAccessToken = function(){
-   return jwt.sign({ 
-        _id : this._id,
-        email : this.email,
-        username : this.username,
+UserSchema.methods.generateAccessToken = function () {
+  return jwt.sign(
+    {
+      _id:      this._id,
+      email:    this.email,
+      username: this.username,
     },
-     process.env.ACCESS_TOKEN_SECRET,
-     {expiresIn: process.env.ACCESS_TOKEN_EXPIRY}
-    );
-}
-UserSchema.methods.generateRefreshToken = function(){
-    return jwt.sign({ 
-        _id : this._id,
-    },
-     process.env.REFRESH_TOKEN_SECRET,
-     {expiresIn: process.env.REFRESH_TOKEN_EXPIRY}
-    );
-}
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+  );
+};
 
+UserSchema.methods.generateRefreshToken = function () {
+  return jwt.sign(
+    { _id: this._id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
+  );
+};
 
-export const User = mongoose.model("User",UserSchema)
+export const User = mongoose.model("User", UserSchema);

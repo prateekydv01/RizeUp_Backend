@@ -3,19 +3,24 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-const generateCircleCode = async () => {
-  const lastCircle = await Circle.findOne()
-    .sort({ createdAt: -1 })
-    .select("code");
+const generateCircleCode = () => {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const numbers = "0123456789";
 
-  if (!lastCircle) {
-    return "C1000";
+  let code = "";
+
+  // first 3 alphabets
+  for (let i = 0; i < 3; i++) {
+    code += letters[Math.floor(Math.random() * letters.length)];
   }
 
-  const lastNumber = parseInt(lastCircle.code.substring(1));
-  return `C${lastNumber + 1}`;
-};
+  // next 3 numbers
+  for (let i = 0; i < 3; i++) {
+    code += numbers[Math.floor(Math.random() * numbers.length)];
+  }
 
+  return code;
+};
 
 export const createCircle = asyncHandler(async (req, res) => {
   const { name } = req.body;
