@@ -199,3 +199,96 @@ export const deleteCalendarEvent = asyncHandler(async (req, res) => {
 
   return res.status(200).json(new ApiResponse(200, {}, "Event deleted from Google Calendar"));
 });
+
+// ── Google Sign-In (Auth) ─────────────────────────────────────────────────────
+
+const AUTH_REDIRECT_URI = process.env.GOOGLE_AUTH_REDIRECT_URI ||
+  `${process.env.BACKEND_URL || "http://localhost:4000"}/api/v1/google/auth/callback`;
+ 
+const getAuthOAuthClient = () =>
+  new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    AUTH_REDIRECT_URI
+  );
+ 
+export const googleSignIn = asyncHandler(async (req, res) => {
+  const oauth2Client = getAuthOAuthClient();
+ 
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    prompt:      "consent",
+    scope: [
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "openid",
+    ],
+  });
+ 
+  // Log so you can verify the redirect_uri being sent
+  console.log("[GoogleSignIn] redirect_uri:", AUTH_REDIRECT_URI);
+  console.log("[GoogleSignIn] auth url:", url);
+ 
+  return res.status(200).json(new ApiResponse(200, { url }, "Google sign-in URL generated"));
+});
+ 
+export const googleSignInCallback = asyncHandler(async (req, res) => {
+  const { code } = req.query;
+  if (!code) throw new ApiError(400, "Missing code");
+ 
+  const oauth2Client = getAuthOAuthClient();
+  const { tokens }   = await oauth2Client.getToken(code);
+  oauth2Client.setCredentials(tokens);
+ 
+  // Fetch Google profile
+  const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+  const { data: profile } = await oauth2.userinfo.get();
+  const { id: googleId, email, name, given_name } = profile;
+ 
+  // Find or create user
+  let user = await User.findOne({ $or: [{ googleId }, { email }] });
+ 
+  if (!user) {
+    const baseUsername = (given_name || name || email.split("@")[0])
+      .toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9]/g, "");
+ 
+    let username = baseUsername;
+    let suffix   = 1;
+    while (await User.findOne({ username })) {
+      username = `${baseUsername}${suffix++}`;
+    }
+ 
+    user = await User.create({
+      fullName:           name || given_name || "User",
+      username,
+      email,
+      googleId,
+      googleAccessToken:  tokens.access_token,
+      googleRefreshToken: tokens.refresh_token,
+      googleTokenExpiry:  tokens.expiry_date,
+      googleConnected:    true,
+    });
+  } else {
+    user.googleId          = googleId;
+    user.googleAccessToken = tokens.access_token;
+    if (tokens.refresh_token) user.googleRefreshToken = tokens.refresh_token;
+    user.googleTokenExpiry = tokens.expiry_date;
+    user.googleConnected   = true;
+    await user.save({ validateBeforeSave: false });
+  }
+ 
+  const accessToken  = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+  user.refreshToken  = refreshToken;
+  await user.save({ validateBeforeSave: false });
+ 
+  const cookieOptions = {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+  };
+ 
+  res
+    .cookie("accessToken",  accessToken,  cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .redirect(`${process.env.FRONTEND_URL}/`);
+});

@@ -9,9 +9,14 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  googleSignIn,
+  googleSignInCallback
 } from "../controllers/google.controller.js";
 
 const router = Router();
+
+router.get("/auth/url",      googleSignIn);
+router.get("/auth/callback", googleSignInCallback);
 
 // Callback doesn't use verifyJWT — userId comes via OAuth state param
 router.get("/callback", handleGoogleCallback);
