@@ -22,7 +22,6 @@ export const createSection = asyncHandler(async (req, res) => {
   );
 });
 
-
 // get all user's todo sections
 export const getSections = asyncHandler(async (req, res) => {
 
@@ -46,7 +45,6 @@ export const getSections = asyncHandler(async (req, res) => {
   );
 });
 
-
 // update section
 export const updateSection = asyncHandler(async (req, res) => {
 
@@ -67,7 +65,6 @@ export const updateSection = asyncHandler(async (req, res) => {
     new ApiResponse(200, section, "Section updated successfully")
   );
 });
-
 
 // delete section
 export const deleteSection = asyncHandler(async (req, res) => {

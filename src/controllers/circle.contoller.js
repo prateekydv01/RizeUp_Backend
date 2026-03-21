@@ -43,9 +43,7 @@ export const createCircle = asyncHandler(async (req, res) => {
   );
 });
 
-/**
- * GET ALL CIRCLES OF USER
- */
+
 export const getUserCircles = asyncHandler(async (req, res) => {
   const circles = await Circle.find({
     members: req.user._id,
@@ -56,9 +54,7 @@ export const getUserCircles = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, circles, "Circles fetched successfully"));
 });
 
-/**
- * GET SINGLE CIRCLE BY ID
- */
+
 export const getCircleById = asyncHandler(async (req, res) => {
   const { circleId } = req.params;
 
@@ -76,9 +72,6 @@ export const getCircleById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, circle, "Circle fetched successfully"));
 });
 
-/**
- * JOIN CIRCLE BY CODE
- */
 export const joinCircle = asyncHandler(async (req, res) => {
   const { code } = req.body;
 
@@ -100,9 +93,6 @@ export const joinCircle = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, circle, "Joined circle successfully"));
 });
 
-/**
- * LEAVE CIRCLE
- */
 export const leaveCircle = asyncHandler(async (req, res) => {
   const { circleId } = req.params;
 
@@ -123,9 +113,7 @@ export const leaveCircle = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Left circle successfully"));
 });
 
-/**
- * DELETE CIRCLE (ADMIN ONLY)
- */
+
 export const deleteCircle = asyncHandler(async (req, res) => {
   const { circleId } = req.params;
 

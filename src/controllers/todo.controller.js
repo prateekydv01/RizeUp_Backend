@@ -3,10 +3,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-
-/**
- * CREATE TODO
- */
 export const createTodo = asyncHandler(async (req, res) => {
 
   const { title, section } = req.body;
@@ -26,10 +22,6 @@ export const createTodo = asyncHandler(async (req, res) => {
   );
 });
 
-
-/**
- * GET TODOS OF A SECTION
- */
 export const getSectionTodos = asyncHandler(async (req, res) => {
 
   const { sectionId } = req.params;
@@ -44,10 +36,6 @@ export const getSectionTodos = asyncHandler(async (req, res) => {
   );
 });
 
-
-/**
- * UPDATE TODO
- */
 export const updateTodo = asyncHandler(async (req, res) => {
 
   const { todoId } = req.params;
@@ -68,10 +56,6 @@ export const updateTodo = asyncHandler(async (req, res) => {
   );
 });
 
-
-/**
- * TOGGLE COMPLETE
- */
 export const toggleTodo = asyncHandler(async (req, res) => {
 
   const { todoId } = req.params;
@@ -94,10 +78,6 @@ export const toggleTodo = asyncHandler(async (req, res) => {
   );
 });
 
-
-/**
- * DELETE TODO
- */
 export const deleteTodo = asyncHandler(async (req, res) => {
 
   const { todoId } = req.params;
