@@ -1,20 +1,24 @@
 import { Router } from "express";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
-    createGoal,
-    getUserGoals,
-    getGoalById,
-    updateGoal,
-    deleteGoal
+  createGoal,
+  getMyGoals,
+  getGoalById,
+  updateGoal,
+  deleteGoal,
+  markGoalComplete,
+  verifyProof,
 } from "../controllers/goal.controller.js";
 
-import { verifyJWT } from "../middlewares/auth.middleware.js";
-
 const router = Router();
+router.use(verifyJWT);
 
-router.post("/create", verifyJWT, createGoal);
-router.get("/user-goals", verifyJWT, getUserGoals);
-router.get("/:goalId", verifyJWT, getGoalById);
-router.patch("/update/:goalId", verifyJWT, updateGoal);
-router.delete("/delete/:goalId", verifyJWT, deleteGoal);
+router.post  ("/",                              createGoal);
+router.get   ("/",                              getMyGoals);
+router.get   ("/:goalId",                       getGoalById);
+router.patch ("/:goalId",                       updateGoal);
+router.delete("/:goalId",                       deleteGoal);
+router.post  ("/:goalId/complete",              markGoalComplete);
+router.post  ("/:goalId/verify/:requestId",     verifyProof);
 
 export default router;
