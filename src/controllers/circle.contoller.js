@@ -43,7 +43,6 @@ export const createCircle = asyncHandler(async (req, res) => {
   );
 });
 
-
 export const getUserCircles = asyncHandler(async (req, res) => {
   const circles = await Circle.find({
     members: req.user._id,
@@ -53,7 +52,6 @@ export const getUserCircles = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, circles, "Circles fetched successfully"));
 });
-
 
 export const getCircleById = asyncHandler(async (req, res) => {
   const { circleId } = req.params;
@@ -112,7 +110,6 @@ export const leaveCircle = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, null, "Left circle successfully"));
 });
-
 
 export const deleteCircle = asyncHandler(async (req, res) => {
   const { circleId } = req.params;

@@ -3,6 +3,7 @@ import { CheckIn } from "../models/checkIn.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { Circle } from "../models/circle.model.js";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const yesterdayStr = () => {
@@ -14,36 +15,69 @@ const yesterdayStr = () => {
 // ── CREATE HABIT ──────────────────────────────────────────────────────────────
 // POST /habits/create
 export const createHabit = asyncHandler(async (req, res) => {
-  const { title, description, type, circleId } = req.body;
+  const { title, description, type = "personal", circleId } = req.body;
 
   if (!title) throw new ApiError(400, "Title is required");
 
-  if (type === "circle" && !circleId) {
-    throw new ApiError(400, "circleId is required for circle habits");
+  const validTypes = ["personal", "circle"];
+  if (!validTypes.includes(type)) {
+    throw new ApiError(400, "Invalid habit type");
+  }
+
+  let members = [req.user._id];
+
+  let circle;
+
+  if (type === "circle") {
+    if (!circleId) {
+      throw new ApiError(400, "circleId is required for circle habits");
+    }
+
+    circle = await Circle.findById(circleId);
+    if (!circle) throw new ApiError(404, "Circle not found");
+
+    if (!circle.members.includes(req.user._id)) {
+      throw new ApiError(403, "You are not a member of this circle");
+    }
+
   }
 
   const habit = await Habit.create({
     title,
     description,
-    type: type || "personal",
+    type,
     circleId: type === "circle" ? circleId : undefined,
     createdBy: req.user._id,
-    members: [req.user._id],  // creator auto-joins
+    members,
   });
+
+  if (type === "circle") {
+    circle.goals.push(habit._id);
+    await circle.save();
+  }
 
   return res.status(201).json(
     new ApiResponse(201, habit, "Habit created successfully")
   );
 });
 
-// ── GET MY HABITS ─────────────────────────────────────────────────────────────
-// GET /habits/my-habits
-// Returns personal habits + circle habits the user has joined
+// ── GET MY HABITS (personal+circle)─────────────────────────────────────────────────────────────
 export const getMyHabits = asyncHandler(async (req, res) => {
-  const habits = await Habit.find({
+  const { page = 1, limit = 10, type } = req.query;
+
+  const filter = {
     members: req.user._id,
     isActive: true,
-  }).populate("circleId", "name code");
+  };
+
+  if (type) filter.type = type;
+
+  const habits = await Habit.find(filter)
+    .populate("circleId", "name code")
+    .populate("createdBy", "username fullName")
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(Number(limit));
 
   return res.status(200).json(
     new ApiResponse(200, habits, "Habits fetched successfully")
@@ -51,9 +85,24 @@ export const getMyHabits = asyncHandler(async (req, res) => {
 });
 
 // ── GET SINGLE HABIT ──────────────────────────────────────────────────────────
-// GET /habits/:habitId
 export const getHabitById = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
+
+  if (habit.type === "personal") {
+  if (habit.createdBy.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Unauthorized access");
+  }
+}
+
+if (habit.type === "circle") {
+  const isMember = habit.members.some(
+    (id) => id.toString() === req.user._id.toString()
+  );
+
+  if (!isMember) {
+    throw new ApiError(403, "You are not a member of this habit");
+  }
+}
 
   const habit = await Habit.findById(habitId)
     .populate("createdBy", "username fullName")
@@ -67,8 +116,7 @@ export const getHabitById = asyncHandler(async (req, res) => {
   );
 });
 
-// ── UPDATE HABIT ──────────────────────────────────────────────────────────────
-// PATCH /habits/update/:habitId
+// ── UPDATE HABIT (only who created)──────────────────────────────────────────────────────────────
 export const updateHabit = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
   const { title, description } = req.body;
@@ -123,33 +171,58 @@ export const joinHabit = asyncHandler(async (req, res) => {
     throw new ApiError(400, "You can only join circle habits");
   }
 
-  if (habit.members.includes(req.user._id)) {
-    throw new ApiError(400, "Already a member of this habit");
+  if (!habit.circleId) {
+    throw new ApiError(400, "Habit is not linked to a circle");
   }
 
-  habit.members.push(req.user._id);
-  await habit.save();
+  const circle = await Circle.findById(habit.circleId);
+  if (!circle) throw new ApiError(404, "Circle not found");
+
+  const isCircleMember = circle.members.some(
+    (id) => id.toString() === req.user._id.toString()
+  );
+
+  if (!isCircleMember) {
+    throw new ApiError(403, "You are not a member of this circle");
+  }
+
+  const updatedHabit = await Habit.findByIdAndUpdate(
+    habitId,
+    { $addToSet: { members: req.user._id } }, // prevents duplicates
+    { new: true }
+  );
 
   return res.status(200).json(
-    new ApiResponse(200, habit, "Joined habit successfully")
+    new ApiResponse(200, updatedHabit, "Joined habit successfully")
   );
 });
 
 // ── LEAVE HABIT ───────────────────────────────────────────────────────────────
-// PATCH /habits/leave/:habitId
 export const leaveHabit = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
 
   const habit = await Habit.findById(habitId);
   if (!habit) throw new ApiError(404, "Habit not found");
 
+  // Creator cannot leave
   if (habit.createdBy.toString() === req.user._id.toString()) {
     throw new ApiError(400, "Creator cannot leave — delete the habit instead");
   }
 
+  // Check if user is actually a member
+  const isMember = habit.members.some(
+    (m) => m.toString() === req.user._id.toString()
+  );
+
+  if (!isMember) {
+    throw new ApiError(400, "You are not a member of this habit");
+  }
+
+  // Remove user
   habit.members = habit.members.filter(
     (m) => m.toString() !== req.user._id.toString()
   );
+
   await habit.save();
 
   return res.status(200).json(
@@ -157,9 +230,7 @@ export const leaveHabit = asyncHandler(async (req, res) => {
   );
 });
 
-// ── GET HABITS BY CIRCLE ──────────────────────────────────────────────────────
-// GET /habits/circle/:circleId
-// Returns all habits for a circle — so members can discover and join
+// ── GET HABITS BY CIRCLE (cirlcle habits for joining)──────────────────────────────────────────────────────
 export const getCircleHabits = asyncHandler(async (req, res) => {
   const { circleId } = req.params;
 
@@ -319,6 +390,7 @@ export const getMembersGraph = asyncHandler(async (req, res) => {
 // ── LINK PERSONAL HABIT TO CIRCLE ────────────────────────────────────────────
 // PATCH /habits/link-circle/:habitId
 // Converts a personal habit to a circle habit and invites all circle members
+
 export const linkHabitToCircle = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
   const { circleId } = req.body;
@@ -328,33 +400,26 @@ export const linkHabitToCircle = asyncHandler(async (req, res) => {
   if (!habit) throw new ApiError(404, "Habit not found");
 
   if (habit.createdBy.toString() !== userId.toString()) {
-    throw new ApiError(403, "Only the creator can link this habit to a circle");
+    throw new ApiError(403, "Only the creator can link this habit");
   }
 
   if (habit.type === "circle") {
     throw new ApiError(400, "Habit is already linked to a circle");
   }
 
-  // Fetch circle to get its members
-  const { Circle } = await import("../models/circle.model.js");
   const circle = await Circle.findById(circleId);
   if (!circle) throw new ApiError(404, "Circle not found");
 
-  // Check creator is a member of the circle
   if (!circle.members.some(m => m.toString() === userId.toString())) {
     throw new ApiError(403, "You are not a member of this circle");
   }
 
-  // Merge existing habit members with circle members (no duplicates)
-  const existingIds = habit.members.map(m => m.toString());
-  const newMembers  = circle.members.filter(m => !existingIds.includes(m.toString()));
-
-  habit.type     = "circle";
+  // Link habit to circle (do NOT auto-add members)
+  habit.type = "circle";
   habit.circleId = circleId;
-  habit.members  = [...habit.members, ...newMembers];
   await habit.save();
 
-  // Also push habit into circle's habits array if not already there
+  // Add habit to circle if not already present
   if (!circle.habits.some(h => h.toString() === habitId)) {
     circle.habits.push(habitId);
     await circle.save();
@@ -368,7 +433,6 @@ export const linkHabitToCircle = asyncHandler(async (req, res) => {
     new ApiResponse(200, populated, "Habit linked to circle successfully")
   );
 });
-
 // ── UNLINK HABIT FROM CIRCLE ──────────────────────────────────────────────────
 // PATCH /habits/unlink-circle/:habitId
 // Converts back to personal habit, keeps check-in history intact
