@@ -120,10 +120,10 @@ export const logoutUser = asyncHandler(async (req, res) => {
     );
 
     const options = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict"
-    };
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "none" // or "strict" — but MUST match login
+};
 
     return res
         .status(200)
