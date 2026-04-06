@@ -4,9 +4,27 @@ import cookieParser from "cookie-parser";
 
 const app = express();
 
+const allowedOrigins = process.env.CORS_ORIGIN
+  ?.split(",")
+  .map(o => o.trim().replace(/\/$/, ""));
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.replace(/\/$/, "");
+
+      if (
+        allowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.includes("localhost")
+      ) {
+        return callback(null, true);
+      } else {
+        console.log("❌ Blocked by CORS:", origin);
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
