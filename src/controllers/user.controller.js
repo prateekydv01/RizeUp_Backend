@@ -60,7 +60,8 @@ export const registerUser = asyncHandler(async(req,res)=>{
 
     const options = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure: true,        
+            sameSite: "none",
         }
     
     return res.status(201)
@@ -93,7 +94,8 @@ export const loginUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,        // REQUIRED for HTTPS (Render)
+    sameSite: "none",
   };
 
   return res
