@@ -3,23 +3,31 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {ApiError} from "../utils/ApiError.js"
 
-const generateAccessAndRefreshToken  = async (userId)=>{
-    try {
-        const user = await User.findById(userId)
-        if (!user){
-            throw new ApiError(404, "No user found!");
-        }
-        const accessToken = user.generateAccessToken()
-        const refreshToken = user.generateRefreshToken()
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
 
-        
-        user.refreshToken = refreshToken
-        await user.save({validateBeforeSave : false})
-        return {accessToken,refreshToken}
-    } catch (error) {
-        throw new ApiError(500,"something went wrong while generating refresh token !")
+    if (!user){
+      throw new ApiError(404, "No user found!");
     }
-}
+
+    console.log("USER FOUND:", user._id);
+
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    console.log("TOKENS:", accessToken, refreshToken);
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+
+  } catch (error) {
+    console.log("🔥 TOKEN ERROR:", error); // <-- ADD THIS
+    throw new ApiError(500,"something went wrong while generating refresh token !");
+  }
+};
 
 export const registerUser = asyncHandler(async(req,res)=>{
     const{fullName,username,email,password}=req.body;
