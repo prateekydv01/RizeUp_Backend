@@ -203,7 +203,7 @@ export const deleteCalendarEvent = asyncHandler(async (req, res) => {
 // ── Google Sign-In (Auth) ─────────────────────────────────────────────────────
 
 const AUTH_REDIRECT_URI = process.env.GOOGLE_AUTH_REDIRECT_URI ||
-  `${process.env.BACKEND_URL || "http://localhost:8000"}/api/v1/google/auth/callback`;
+  `${process.env.BACKEND_URL || "http://localhost:4000"}/api/v1/google/auth/callback`;
 
 const getAuthOAuthClient = () =>
   new google.auth.OAuth2(
@@ -284,7 +284,8 @@ export const googleSignInCallback = asyncHandler(async (req, res) => {
 
   const cookieOptions = {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === "production",
+    secure: true,        // MUST for HTTPS
+    sameSite: "none",
   };
 
   res
