@@ -155,6 +155,8 @@ export const getGoalById = asyncHandler(async (req, res) => {
 
   const goal = await Goal.findById(goalId)
     .populate("circleId", "name code members admin")
+    .populate("completedBy.userId", "username email")
+    .populate("completionRequests.userId", "username email")
     .lean();
 
   if (!goal) throw new ApiError(404, "Goal not found");
@@ -481,6 +483,8 @@ export const getCircleGoals = asyncHandler(async (req, res) => {
 
   const goals = await Goal.find({ circleId })
     .populate("createdBy", "username")
+    .populate("members", "username")
+    .populate("completedBy.userId", "username")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -500,21 +504,21 @@ export const getGoalLeaderboard = asyncHandler(async (req, res) => {
   const { goalId } = req.params;
 
   const goal = await Goal.findById(goalId)
-    .populate("completedBy.userId", "name email");
+    .populate("completedBy.userId", "username fullName email"); // ✅ added fullName
 
   if (!goal) throw new ApiError(404, "Goal not found");
 
-  // 🔥 sort by completion time (earliest first)
+  // sort by completion time
   const sorted = goal.completedBy.sort(
     (a, b) => new Date(a.completedAt) - new Date(b.completedAt)
   );
 
-  // 🏆 assign ranks
   const leaderboard = sorted.map((entry, index) => ({
     rank: index + 1,
     userId: entry.userId._id,
-    name: entry.userId.name,
-    email: entry.userId.email,
+    fullName: entry.userId.fullName,   // ✅ added
+    username: entry.userId.username,   // optional but useful
+    email: entry.userId.email,         // optional
     completedAt: entry.completedAt
   }));
 
