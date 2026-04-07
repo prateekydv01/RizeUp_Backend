@@ -1,8 +1,12 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { createServer } from "http";
+import { initSocket } from "./socket.js";
 
 const app = express();
+const httpServer = createServer(app);   // wrap express in http server
+const io         = initSocket(httpServer);
 
 const allowedOrigins = process.env.CORS_ORIGIN
   ?.split(",")
@@ -66,4 +70,4 @@ app.use((err, req, res, next) => {
 });
 
 
-export { app };
+export { httpServer };
