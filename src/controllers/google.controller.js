@@ -284,12 +284,15 @@ export const googleSignInCallback = asyncHandler(async (req, res) => {
 
   const cookieOptions = {
     httpOnly: true,
-    secure: true,        // MUST for HTTPS
-    sameSite: "none",
-  };
+    secure: process.env.NODE_ENV === "production", 
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+};
 
   res
     .cookie("accessToken",  accessToken,  cookieOptions)
     .cookie("refreshToken", refreshToken, cookieOptions)
-    .redirect(`${process.env.FRONTEND_URL}/`);
+   res.redirect(
+  `${process.env.FRONTEND_URL}/auth-success?accessToken=${accessToken}`
+);
+
 });
