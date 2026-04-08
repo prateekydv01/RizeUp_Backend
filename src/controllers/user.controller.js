@@ -59,10 +59,10 @@ export const registerUser = asyncHandler(async(req,res)=>{
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
     const options = {
-            httpOnly: true,
-            secure: true,        
-            sameSite: "none",
-        }
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", 
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      };
     
     return res.status(201)
             .cookie("accessToken", accessToken, options)
@@ -94,9 +94,9 @@ export const loginUser = asyncHandler(async (req, res) => {
 
   const options = {
     httpOnly: true,
-    secure: true,        // REQUIRED for HTTPS (Render)
-    sameSite: "none",
-  };
+    secure: process.env.NODE_ENV === "production", 
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+};
 
   return res
     .status(200)
