@@ -347,17 +347,20 @@ export const verifyProof = asyncHandler(async (req, res) => {
   const goal = await Goal.findById(goalId);
   if (!goal) throw new ApiError(404, "Goal not found");
 
-   if (!goal.members.some(m => m.toString() === userId.toString())) {
+  // ✅ Check membership
+  if (!goal.members.some(m => m.toString() === userId.toString())) {
     throw new ApiError(403, "Not a member of this goal");
   }
 
   const request = goal.completionRequests.id(requestId);
   if (!request) throw new ApiError(404, "Request not found");
 
+  // ❌ Cannot verify own proof
   if (request.userId.toString() === userId.toString()) {
     throw new ApiError(400, "Cannot verify your own proof");
   }
 
+  // ❌ Already voted check
   const alreadyVoted =
     request.approvals.some(a => a.userId.toString() === userId.toString()) ||
     request.rejections.some(r => r.userId.toString() === userId.toString());
@@ -366,6 +369,7 @@ export const verifyProof = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Already voted");
   }
 
+  // ✅ Voting
   if (action === "approve") {
     request.approvals.push({ userId });
   } else if (action === "reject") {
@@ -374,10 +378,15 @@ export const verifyProof = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid action");
   }
 
-  // ⭐ USE SNAPSHOT (VERY IMPORTANT)
-  const totalMembers = request.totalMembersAtRequest - 1;
+  // ⭐ SNAPSHOT LOGIC (VERY IMPORTANT)
+  const totalMembersAtRequest = request.totalMembersAtRequest; // e.g. 3
+  const totalVoters = totalMembersAtRequest - 1; // exclude requester → 2
 
-  if (request.approvals.length >= Math.ceil(totalMembers / 2)) {
+  // ✅ STRICT MAJORITY (> 50%)
+  const majority = Math.floor(totalVoters / 2) + 1;
+
+  // ✅ APPROVAL LOGIC
+  if (request.approvals.length >= majority) {
     request.status = "approved";
     request.completedAt = new Date();
 
@@ -386,13 +395,14 @@ export const verifyProof = asyncHandler(async (req, res) => {
       completedAt: request.completedAt
     });
 
+    // Optional: mark goal completed if creator completes
     if (request.userId.toString() === goal.createdBy.toString()) {
       goal.status = "completed";
     }
   }
 
-  // (optional rejection logic)
-  if (request.rejections.length >= Math.ceil(totalMembers / 2)) {
+  // ✅ REJECTION LOGIC
+  if (request.rejections.length >= majority) {
     request.status = "rejected";
   }
 
