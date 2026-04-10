@@ -292,7 +292,7 @@ export const googleSignInCallback = asyncHandler(async (req, res) => {
     .cookie("accessToken",  accessToken,  cookieOptions)
     .cookie("refreshToken", refreshToken, cookieOptions)
    res.redirect(
-  `${process.env.FRONTEND_URL}/auth-success?accessToken=${accessToken}`
+  `${process.env.FRONTEND_URL}`
 );
 
 });
