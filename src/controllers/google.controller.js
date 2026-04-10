@@ -202,9 +202,9 @@ export const deleteCalendarEvent = asyncHandler(async (req, res) => {
 
 // ── Google Sign-In (Auth) ─────────────────────────────────────────────────────
 
-const AUTH_REDIRECT_URI = process.env.GOOGLE_AUTH_REDIRECT_URI ||
-  `${process.env.BACKEND_URL || "http://localhost:4000"}/api/v1/google/auth/callback`;
-
+const AUTH_REDIRECT_URI =
+  "https://rizeup-prateek.vercel.app/api/v1/google/auth/callback";
+  
 const getAuthOAuthClient = () =>
   new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
