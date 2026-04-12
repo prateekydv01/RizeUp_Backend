@@ -36,6 +36,11 @@ const completionRequestSchema = new Schema({
     }
   ],
 
+  totalMembersAtRequest: {
+    type: Number,
+    required: true
+  },
+
   completedAt: Date
 }, { timestamps: true });
 
@@ -114,7 +119,31 @@ const goalSchema = new Schema(
       type: String,
       enum: ["active", "completed", "backlog"],
       default: "active"
-    }
+    },
+    
+    dailyLogs: [
+      {
+        userId: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true
+        },
+
+        date: {
+          type: Date,
+          required: true
+        },
+
+        text: {
+          type: String,
+          required: true
+        },
+
+        proof: {
+          type: String // optional image/video
+        }
+      }
+    ]
 
   },
   { timestamps: true }

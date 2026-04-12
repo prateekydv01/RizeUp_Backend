@@ -11,7 +11,9 @@ import {
   joinGoal,
   leaveGoal,
   getCircleGoals,
-  getGoalLeaderboard
+  getGoalLeaderboard,
+  addDailyLog,
+  getGoalLogs
 } from "../controllers/goal.controller.js";
 
 const router = Router();
@@ -26,6 +28,9 @@ router.post("/:goalId/leave", leaveGoal);
 
 router.post("/:goalId/complete", markGoalComplete);
 router.post("/:goalId/verify/:requestId", verifyProof);
+
+router.post("/:goalId/logs", verifyJWT, addDailyLog);
+router.get("/:goalId/logs", verifyJWT, getGoalLogs);
 
 // 🧠 general CRUD
 router.post("/", createGoal);
