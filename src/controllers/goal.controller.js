@@ -48,6 +48,7 @@ export const getMyGoals = asyncHandler(async (req, res) => {
   const userId = req.user._id.toString();
   const { page = 1, limit = 50 } = req.query;
   const now = new Date();
+  req.userId?._id?.toString() === userId
 
   // ✅ FIX: Auto-move overdue active goals to backlog BEFORE fetching
   await Goal.updateMany(
@@ -105,7 +106,13 @@ export const getGoalById = asyncHandler(async (req, res) => {
     isOwner:      goal.createdBy.toString() === userId,
     isCircleGoal: !!goal.circleId,
     isCompleted:  (goal.completedBy || []).some(e => e.userId?.toString() === userId),
-    isPending:    (goal.completionRequests || []).some(r => r.userId?.toString() === userId && r.status === "pending"),
+    isMyPending: (goal.completionRequests || []).some(
+      r => r.userId?._id?.toString() === userId && r.status === "pending"
+    ),
+
+    hasPendingToVerify: (goal.completionRequests || []).some(
+      r => r.userId?._id?.toString() !== userId && r.status === "pending"
+    ),
   };
 
   return res.status(200).json(new ApiResponse(200, enrichedGoal, "Goal fetched"));
