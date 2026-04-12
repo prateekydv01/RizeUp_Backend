@@ -4,9 +4,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Circle } from "../models/circle.model.js";
+import { HabitProgress } from "../models/HabitProgress.model.js";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const yesterdayStr = () => {
+const getToday = () => new Date().toISOString().slice(0, 10);
+const getYesterday = () => {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
@@ -63,24 +64,49 @@ export const createHabit = asyncHandler(async (req, res) => {
 
 // ── GET MY HABITS (personal+circle)─────────────────────────────────────────────────────────────
 export const getMyHabits = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, type } = req.query;
-
-  const filter = {
+  const habits = await Habit.find({
     members: req.user._id,
     isActive: true,
-  };
-
-  if (type) filter.type = type;
-
-  const habits = await Habit.find(filter)
+  })
     .populate("circleId", "name code")
     .populate("createdBy", "username fullName")
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(Number(limit));
+    .sort({ createdAt: -1 });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const habitsWithStreak = await Promise.all(
+    habits.map(async (habit) => {
+      const progress = await HabitProgress.findOne({
+        userId: req.user._id,
+        habitId: habit._id,
+      });
+
+      let streak = 0;
+
+      if (progress) {
+        const lastDate = progress.lastCheckInDate;
+
+        if (lastDate === today || lastDate === yesterday) {
+          streak = progress.streak;
+        } else {
+          streak = 0;
+        }
+      }
+
+      return {
+        ...habit.toObject(),
+        streak,
+      };
+    })
+  );
 
   return res.status(200).json(
-    new ApiResponse(200, habits, "Habits fetched successfully")
+    new ApiResponse(200, habitsWithStreak, "Habits fetched successfully")
   );
 });
 
@@ -252,51 +278,84 @@ export const getCircleHabits = asyncHandler(async (req, res) => {
 export const checkInHabit = asyncHandler(async (req, res) => {
   const { habitId } = req.params;
   const userId = req.user._id;
-  const today = todayStr();
+
+  const today = getToday();
+  const yesterday = getYesterday();
 
   const habit = await Habit.findById(habitId);
   if (!habit) throw new ApiError(404, "Habit not found");
 
   if (!habit.members.includes(userId)) {
-    throw new ApiError(403, "You are not a member of this habit");
+    throw new ApiError(403, "Not a member of this habit");
   }
 
+  // 🔍 check if already checked today
   const existing = await CheckIn.findOne({
     userId,
-    entityType: "habit",
     entityId: habitId,
+    entityType: "habit",
     date: today,
   });
 
-  // Toggle off
+  // =========================
+  // ❌ UNDO CHECK-IN
+  // =========================
   if (existing) {
     await existing.deleteOne();
 
-    // Recalculate streak — just decrement if it was today
-    if (habit.lastCheckInDate === today) {
-      habit.streak = Math.max(0, (habit.streak || 1) - 1);
-      habit.lastCheckInDate = yesterdayStr();
-      await habit.save({ validateBeforeSave: false });
+    const checkIns = await CheckIn.find({
+      userId,
+      entityId: habitId,
+      entityType: "habit",
+    }).select("date");
+
+    const dates = checkIns
+      .map(c => c.date)
+      .sort((a, b) => new Date(b) - new Date(a));
+
+    let newStreak = 0;
+    let lastDate = null;
+
+    if (dates.length > 0) {
+      lastDate = dates[0];
+
+      if (lastDate === today || lastDate === yesterday) {
+        let streak = 1;
+
+        for (let i = 0; i < dates.length - 1; i++) {
+          const curr = new Date(dates[i]);
+          const next = new Date(dates[i + 1]);
+
+          const diff = (curr - next) / (1000 * 60 * 60 * 24);
+
+          if (diff === 1) streak++;
+          else break;
+        }
+
+        newStreak = streak;
+      }
     }
 
+    await HabitProgress.findOneAndUpdate(
+      { userId, habitId },
+      {
+        streak: newStreak,
+        lastCheckInDate: lastDate,
+      },
+      { upsert: true }
+    );
+
     return res.status(200).json(
-      new ApiResponse(200, { checkedIn: false, streak: habit.streak }, "Check-in removed")
+      new ApiResponse(200, {
+        checkedIn: false,
+        streak: newStreak,
+      }, "Check-in removed")
     );
   }
 
-  // Toggle on — update streak
-  let newStreak;
-  if (habit.lastCheckInDate === yesterdayStr()) {
-    newStreak = (habit.streak || 0) + 1;
-  } else if (habit.lastCheckInDate === today) {
-    newStreak = habit.streak;
-  } else {
-    newStreak = 1;  // streak broken, reset
-  }
-
-  habit.streak = newStreak;
-  habit.lastCheckInDate = today;
-  await habit.save({ validateBeforeSave: false });
+  // =========================
+  // ✅ NORMAL CHECK-IN
+  // =========================
 
   await CheckIn.create({
     userId,
@@ -306,8 +365,31 @@ export const checkInHabit = asyncHandler(async (req, res) => {
     completed: true,
   });
 
+  let progress = await HabitProgress.findOne({ userId, habitId });
+
+  if (!progress) {
+    progress = await HabitProgress.create({
+      userId,
+      habitId,
+      streak: 1,
+      lastCheckInDate: today,
+    });
+  } else {
+    if (progress.lastCheckInDate === yesterday) {
+      progress.streak += 1;
+    } else if (progress.lastCheckInDate !== today) {
+      progress.streak = 1;
+    }
+
+    progress.lastCheckInDate = today;
+    await progress.save();
+  }
+
   return res.status(201).json(
-    new ApiResponse(201, { checkedIn: true, streak: newStreak }, "Habit checked in")
+    new ApiResponse(201, {
+      checkedIn: true,
+      streak: progress.streak,
+    }, "Habit checked in")
   );
 });
 

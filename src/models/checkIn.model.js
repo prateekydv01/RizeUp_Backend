@@ -42,6 +42,8 @@ const CheckInSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "Circle",
     },
+
+    
   },
   { timestamps: true }
 );
