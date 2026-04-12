@@ -61,7 +61,7 @@ export const getMyGoals = asyncHandler(async (req, res) => {
   );
 
   const goals = await Goal.find({ $or: [{ createdBy: userId }, { members: userId }] })
-    .populate("circleId", "name code")
+    .populate("circleId", "name code admin")
     .populate("completedBy.userId", "username fullName")
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
@@ -154,12 +154,41 @@ export const deleteGoal = asyncHandler(async (req, res) => {
 
   const goal = await Goal.findById(goalId);
   if (!goal) throw new ApiError(404, "Goal not found");
-  if (goal.createdBy.toString() !== userId) throw new ApiError(403, "Not authorized");
 
-  if (goal.circleId) await Circle.findByIdAndUpdate(goal.circleId, { $pull: { goals: goal._id } });
+  let isAdmin = false;
+
+  // If goal belongs to a circle → check admin
+  if (goal.circleId) {
+    const circle = await Circle.findById(goal.circleId);
+
+    if (!circle) throw new ApiError(404, "Circle not found");
+
+    // adjust this depending on your schema
+    isAdmin = circle.admin?.toString() === userId;
+    // OR if multiple admins:
+    // isAdmin = circle.admins?.some(id => id.toString() === userId);
+  }
+
+  // Allow if creator OR admin
+  if (
+    goal.createdBy.toString() !== userId &&
+    !isAdmin
+  ) {
+    throw new ApiError(403, "Not authorized");
+  }
+
+  // Remove goal from circle
+  if (goal.circleId) {
+    await Circle.findByIdAndUpdate(goal.circleId, {
+      $pull: { goals: goal._id },
+    });
+  }
+
   await goal.deleteOne();
 
-  return res.status(200).json(new ApiResponse(200, {}, "Goal deleted"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Goal deleted"));
 });
 
 // ── MARK COMPLETE ───────────────────────────────────────────
