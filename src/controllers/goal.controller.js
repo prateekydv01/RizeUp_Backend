@@ -98,6 +98,10 @@ export const getGoalById = asyncHandler(async (req, res) => {
     .populate("completionRequests.userId", "username fullName email")
     .lean();
 
+    const isJoined = (goal.members || []).some(
+    member => member.toString() === userId
+  );
+
   if (!goal) throw new ApiError(404, "Goal not found");
   if (!canAccessGoal(goal, userId)) throw new ApiError(403, "Not allowed");
 
@@ -105,6 +109,7 @@ export const getGoalById = asyncHandler(async (req, res) => {
     ...goal,
     isOwner:      goal.createdBy.toString() === userId,
     isCircleGoal: !!goal.circleId,
+    isJoined,
     isCompleted:  (goal.completedBy || []).some(e => e.userId?.toString() === userId),
     isMyPending: (goal.completionRequests || []).some(
       r => r.userId?._id?.toString() === userId && r.status === "pending"
