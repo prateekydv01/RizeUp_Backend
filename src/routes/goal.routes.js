@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
+import { upload } from "../middlewares/multer.middleware.js";
 import {
   createGoal,
   getMyGoals,
@@ -26,7 +27,7 @@ router.get("/:goalId/leaderboard", getGoalLeaderboard);
 router.post("/:goalId/join", joinGoal);
 router.post("/:goalId/leave", leaveGoal);
 
-router.post("/:goalId/complete", markGoalComplete);
+router.post("/:goalId/complete",upload.single("proof"), markGoalComplete);
 router.post("/:goalId/verify/:requestId", verifyProof);
 
 router.post("/:goalId/logs", verifyJWT, addDailyLog);

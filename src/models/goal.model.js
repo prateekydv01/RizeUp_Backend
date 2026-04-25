@@ -11,6 +11,9 @@ const completionRequestSchema = new Schema({
     type: String, // image/video URL
     required: true
   },
+  public_id:{
+    type:String, 
+  },
 
   status: {
     type: String,

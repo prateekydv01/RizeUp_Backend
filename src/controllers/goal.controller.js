@@ -3,6 +3,8 @@ import { Circle } from "../models/circle.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 const canAccessGoal = (goal, userId) => {
   if (goal.createdBy.toString() === userId.toString()) return true;
@@ -197,36 +199,70 @@ export const deleteGoal = asyncHandler(async (req, res) => {
 });
 
 // ── MARK COMPLETE ───────────────────────────────────────────
+
 export const markGoalComplete = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const { goalId } = req.params;
-  const { proof } = req.body;
 
   const goal = await Goal.findById(goalId);
   if (!goal) throw new ApiError(404, "Goal not found");
-  if (!goal.members.some(m => m.toString() === userId.toString())) throw new ApiError(403, "Not a member");
-  if (goal.completedBy.some(e => e.userId.toString() === userId.toString())) throw new ApiError(400, "Already completed");
 
-  if (goal.type === "personal") {
+  if (!goal.members.some(m => m.toString() === userId.toString()))
+    throw new ApiError(403, "Not a member");
+
+  if (goal.completedBy.some(e => e.userId.toString() === userId.toString()))
+    throw new ApiError(400, "Already completed");
+
+  // PERSONAL / SINGLE MEMBER CASE
+  if (goal.type === "personal" || goal.members.length === 1) {
     goal.completedBy.push({ userId, completedAt: new Date() });
     goal.status = "completed";
     await goal.save();
+
     return res.json(new ApiResponse(200, goal, "Goal completed"));
   }
 
-  if (goal.members.length === 1) {
-    goal.completedBy.push({ userId, completedAt: new Date() });
-    goal.status = "completed";
+  if (!req.file) throw new ApiError(400, "Proof file required");
+
+  let uploadedProof;
+
+  try {
+    // ✅ Upload first
+    uploadedProof = await uploadOnCloudinary(req.file.path);
+
+    if (!uploadedProof?.url) {
+      throw new ApiError(500, "Upload failed");
+    }
+
+    // ✅ Check duplicate AFTER upload (optional: you can move before upload to save cost)
+    // if (goal.completionRequests.find(r => r.userId.toString() === userId.toString())) {
+    //   throw new ApiError(400, "Already submitted");
+    // }
+
+    // ✅ Save to DB
+    goal.completionRequests.push({
+      userId,
+      proof: uploadedProof.url,
+      public_id: uploadedProof.public_id,
+      status: "pending",
+      approvals: [],
+      rejections: [],
+      totalMembersAtRequest: goal.members.length
+    });
+
     await goal.save();
-    return res.json(new ApiResponse(200, goal, "Auto completed"));
+
+    return res.json(new ApiResponse(200, goal, "Proof submitted"));
+
+  } catch (error) {
+
+    // ❗🔥 IMPORTANT: rollback upload if something fails
+    if (uploadedProof?.public_id) {
+      await deleteFromCloudinary(uploadedProof.public_id);
+    }
+
+    throw error;
   }
-
-  if (!proof) throw new ApiError(400, "Proof required");
-  if (goal.completionRequests.find(r => r.userId.toString() === userId.toString())) throw new ApiError(400, "Already submitted");
-
-  goal.completionRequests.push({ userId, proof, status: "pending", approvals: [], rejections: [], totalMembersAtRequest: goal.members.length });
-  await goal.save();
-  return res.json(new ApiResponse(200, goal, "Proof submitted"));
 });
 
 // ── VERIFY PROOF ─────────────────────────────────────────── (FIXED: all members see all pending requests)
